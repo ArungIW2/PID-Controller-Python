@@ -65,4 +65,4 @@ __all__ = [
     "ziegler_nichols_closed_loop",
 ]
 
-__version__ = "0.1.0"
+__version__ = "1.0.0"

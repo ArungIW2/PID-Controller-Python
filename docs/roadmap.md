@@ -3,6 +3,9 @@
 Each phase is sized as a reviewable Git commit and includes tests for the
 behavior it introduces.
 
+> **Status:** Phases 1–10 are complete in portfolio release 1.0.0. The roadmap
+> is retained to show the engineering sequence and commit boundaries.
+
 ## Phase 1 — Foundation and engineering contract
 
 **Deliverable:** Installable `src`-layout package, repository conventions,
@@ -136,4 +139,3 @@ clean-environment installation.
 and honest presentation of engineering evidence.
 
 **Suggested commit:** `docs: prepare validated portfolio release`
-

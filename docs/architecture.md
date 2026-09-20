@@ -7,7 +7,7 @@ must not know which mathematical model, logger, plotter, or experiment invokes
 it. This allows calculations to be tested directly and reused later without a
 large framework.
 
-## Target component view
+## Component view
 
 ```mermaid
 flowchart TD
@@ -21,7 +21,7 @@ flowchart TD
     VIZ --> RES
 ```
 
-## Planned package structure
+## Package structure
 
 ```text
 src/pid_controller/
@@ -36,8 +36,8 @@ src/pid_controller/
 └── exceptions.py     # Domain-specific validation errors
 ```
 
-Modules will be added only when their phase begins; the tree above is a design
-contract, not an excuse to create empty files.
+The implemented package follows this separation; experiments and examples use
+only these public responsibilities rather than duplicating controller equations.
 
 ## Responsibility boundaries
 
@@ -91,4 +91,3 @@ Each decision will be encoded in tests before it is considered stable.
 Dependencies point inward toward domain calculations. Matplotlib and Pandas
 must never be required to import or execute the controller core. NumPy may be
 used for array-oriented analysis, not for hiding the PID algorithm.
-

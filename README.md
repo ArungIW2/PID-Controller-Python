@@ -4,152 +4,230 @@
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-An educational, software-only implementation of feedback control and PID
-control in Python. The project is designed as an engineering portfolio project:
-the controller algorithm is implemented from first principles, exercised
-against a mathematical process model, measured with control-response metrics,
-and protected by automated tests.
+A software-only, from-first-principles PID controller for learning feedback
+control, discrete implementation, response analysis, tuning, and Python
+engineering. The project was built as an engineering portfolio for a career
+path from production operations toward Automation/PLC Engineering.
 
-> **Project status:** Phase 1 of 10 — repository foundation. The PID algorithm
-> is intentionally not implemented yet. See the [roadmap](docs/roadmap.md).
+The repository deliberately avoids PID libraries as its controller
+implementation. NumPy, Pandas, and Matplotlib support analysis and
+visualization; they do not hide the control algorithm.
 
-## Motivation
+> This is educational control software. It has not been tested on an industrial
+> machine, PLC, actuator, or safety system and must not be represented as such.
 
-This repository supports a learning path from production operations toward
-Automation/PLC Engineering. It focuses on the transferable ideas behind PID
-control—feedback, discrete-time implementation, saturation, windup, tuning,
-and response analysis—before those ideas are applied to a particular PLC or
-industrial platform.
+## Capabilities
 
-This project does **not** use or emulate physical hardware, and its future
-results must not be interpreted as tests on a real machine or industrial
-process.
+- P, PI, PD, and PID behavior through independently configurable gains
+- Fixed, validated sample time and deterministic reset
+- Derivative-on-measurement or derivative-on-error
+- First-order derivative filtering
+- Output and integral limits
+- Integral clamping and back-calculation anti-windup
+- Manual/automatic modes with bumpless return to automatic
+- Setpoint schedules and a first-order mathematical process model
+- Typed time-series records, Pandas conversion, and CSV export
+- Rise time, settling time, overshoot, peak, final error, IAE, and ISE
+- Response, output, error, PID-term, and comparison plots
+- Reproducible gain sweeps and P/PI/PID experiments
+- Bounded parameter-grid tuning and model-parameter robustness studies
+- Transparent Ziegler–Nichols gain conversion when valid `Ku` and `Pu` exist
+- Automated tests, coverage enforcement, Ruff, strict Mypy, and multi-version CI
 
-## Planned control law
-
-The continuous-time reference equation is:
-
-\[
-u(t) = K_p e(t) + K_i \int e(t)\,dt + K_d \frac{de(t)}{dt}
-\]
-
-where \(e(t) = SP(t) - PV(t)\). The implementation will use an explicit,
-documented discrete-time form suitable for deterministic software tests.
-
-## Planned closed loop
+## Control loop
 
 ```mermaid
 flowchart LR
-    SP[Setpoint] --> E[Error]
+    SP[Setpoint] --> E[Error: SP - PV]
     PV[Process variable] --> E
     E --> C[PID controller]
-    C --> U[Controller output]
-    U --> M[Mathematical process model]
+    C --> U[Limited output]
+    U --> M[Mathematical process]
     M --> PV
 ```
 
-The initial model will be a first-order linear process:
+The continuous reference equation is:
 
 \[
-\frac{dy}{dt} = \frac{K u - y}{\tau}
+u(t)=K_p e(t)+K_i\int e(t)dt+K_d\frac{de(t)}{dt}
 \]
 
-It is a mathematical teaching model, not a digital twin or hardware
-simulation. The choice and limitations are documented in
-[requirements and scope](docs/requirements.md).
+The actual code uses documented discrete-time equations. See
+[PID theory](docs/pid-theory.md) for integral, derivative, filtering,
+saturation, anti-windup, and bumpless-transfer decisions.
+
+## Mathematical process model
+
+The default process is the stable first-order equation:
+
+\[
+\frac{dy}{dt}=\frac{Ku-y}{\tau}
+\]
+
+It is integrated with forward Euler at the controller sample time. This model
+is intentionally compact: it exposes controller behavior without pretending to
+be a digital twin or hardware simulation.
 
 ## Architecture
 
-The target architecture separates controller logic, process dynamics,
-simulation orchestration, metrics, visualization, and experiments. This keeps
-the controller independently testable and prevents plotting or file I/O from
-leaking into the control algorithm.
+```mermaid
+flowchart TD
+    EX[Experiment configuration] --> SIM[Closed-loop runner]
+    SIM --> CTRL[PID controller]
+    SIM --> MODEL[Process model]
+    SIM --> LOG[Typed records]
+    LOG --> MET[Response metrics]
+    LOG --> VIZ[Visualization]
+    MET --> TUNE[Tuning and ranking]
+```
 
-See [architecture.md](docs/architecture.md) for module responsibilities and
-dependency rules.
+Controller arithmetic is independent from process dynamics, orchestration,
+Pandas, plotting, and tuning. Detailed responsibilities and dependency rules
+are in [architecture.md](docs/architecture.md).
 
 ## Installation
 
-Phase 1 requires Python 3.10 or newer.
+Python 3.10 or newer is required.
 
 ```bash
 git clone https://github.com/ArungIW2/PID-Controller-Python.git
 cd PID-Controller-Python
 python -m venv .venv
-```
-
-Activate the virtual environment, then install the project and development
-tools:
-
-```bash
 python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 ```
 
-## Usage
+Activate the virtual environment using the command appropriate for your shell.
 
-There is no controller API in Phase 1. A runnable example will arrive with the
-first controller increment. This status is explicit so that repository users
-do not mistake scaffolding for a validated control implementation.
+## Basic usage
+
+```python
+from pid_controller import (
+    FirstOrderProcess,
+    PIDConfig,
+    PIDController,
+    calculate_metrics,
+    run_closed_loop,
+)
+
+controller = PIDController(
+    PIDConfig(
+        kp=2.0,
+        ki=0.5,
+        kd=0.1,
+        sample_time=0.05,
+        output_limits=(0.0, 2.0),
+        derivative_filter_tau=0.1,
+    )
+)
+
+result = run_closed_loop(
+    controller,
+    FirstOrderProcess(),
+    duration=20.0,
+    setpoint=1.0,
+)
+
+print(calculate_metrics(result))
+result.to_csv("results/basic-response.csv")
+```
+
+See [`examples/`](examples/) for basic simulation and tuning workflows.
+
+## Curated comparison
+
+The following P, PI, and PID responses use the same first-order process,
+setpoint, duration, and sample time.
+
+![P, PI, and PID mathematical response comparison](docs/assets/controller-comparison.png)
+
+| Controller | Rise time | Settling time | Overshoot | Final error | IAE |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| P | Not reached | Not settled | 0.00% | 0.3333 | 6.8722 |
+| PI | 6.35 s | 15.55 s | 0.00% | 0.0091 | 1.9235 |
+| PID | 6.25 s | 15.40 s | 0.00% | 0.0088 | 1.9255 |
+
+These values are properties of the declared mathematical scenario, not machine
+performance claims. Regenerate the plot and source CSV with:
+
+```bash
+python scripts/generate_release_assets.py
+```
+
+## Experiments
+
+```bash
+python experiments/proportional/run.py
+python experiments/integral/run.py
+python experiments/derivative/run.py
+python experiments/pid/run.py
+```
+
+Each experiment writes trace CSVs, a metric summary, a configuration manifest,
+and a comparison plot under `results/`. See
+[experiments.md](docs/experiments.md) for interpretation rules.
+
+## Tuning
+
+The project supports three deliberately distinct approaches:
+
+1. Manual tuning for understanding controller effects.
+2. Bounded parameter sweep with explicit cost weights.
+3. Classic closed-loop Ziegler–Nichols gain conversion only when legitimate
+   ultimate gain and period measurements already exist.
+
+The stable first-order model without delay is not forced into an invalid
+ultimate-oscillation exercise. See [tuning.md](docs/tuning.md) for assumptions,
+trade-offs, and robustness evaluation.
 
 ## Testing and quality
-
-Run the current checks locally:
 
 ```bash
 python -m pytest
 python -m ruff check .
 python -m mypy src
+python -m build
 ```
 
-GitHub Actions runs the same checks on Python 3.10, 3.11, and 3.12. Tests will
-be added in the same phase as each behavior they verify.
+The test suite covers controller calculations, validation, state reset,
+derivative behavior, saturation, anti-windup, mode transfer, process equations,
+simulation ordering, metrics, export, plots, experiments, tuning, and edge
+cases. CI runs on Python 3.10, 3.11, and 3.12.
 
-## Experiments and results
+## Repository structure
 
-Planned reproducible experiments compare:
-
-- multiple proportional gains;
-- multiple integral gains and windup behavior;
-- multiple derivative gains and damping;
-- P, PI, and PID controllers under the same model and scenario;
-- selected manual, rule-based, and parameter-sweep tuning approaches.
-
-Generated plots and CSV files belong in `results/` and are ignored by Git by
-default. Curated release results may be committed deliberately with their
-configuration and provenance.
-
-## Response metrics
-
-The planned analysis includes rise time, settling time, overshoot, peak value,
-steady-state error, Integral Absolute Error (IAE), and Integral Squared Error
-(ISE). Metric definitions and edge-case behavior will be documented alongside
-their implementation so comparisons remain meaningful.
-
-## PID tuning
-
-Tuning work is scheduled after the core controller, model, simulation runner,
-and metrics are verified. The project will compare manual tuning, an applicable
-rule-based method, and parameter sweep. Ziegler–Nichols will only be included
-when its assumptions and limitations can be demonstrated honestly for the
-chosen model.
+```text
+src/pid_controller/    Controller, model, simulation, metrics, plots, tuning
+tests/                 Unit and integration tests
+examples/              Minimal public-API workflows
+experiments/           Reproducible Kp, Ki, Kd, and controller comparisons
+docs/                  Theory, architecture, experiments, tuning, release notes
+scripts/               Curated documentation-asset generation
+results/               Generated local artifacts, ignored by default
+```
 
 ## Limitations
 
-- The project is educational software, not a safety-certified controller.
-- The mathematical model does not reproduce all nonlinearities, delays,
-  disturbances, noise, or constraints of an industrial process.
-- Results from the mathematical model are not evidence of performance on real
-  equipment.
-- Real-time scheduling and PLC scan-cycle behavior are outside the initial
-  scope.
+- Not a real-time runtime, PLC emulator, safety controller, or certified library.
+- No hardware, actuator, sensor, motor, communication network, or scan-cycle
+  timing is represented.
+- The first-order model omits delay, nonlinearities, measurement noise, and
+  actuator dynamics unless a future scenario introduces them explicitly.
+- Tuning results depend on model, command, constraints, metric definitions, and
+  objective weights.
+- A strong software result does not replace commissioning and validation on a
+  real target system.
 
-## Future development
+## Documentation
 
-The ten-phase delivery plan covers P, PI, PD/PID, process modelling,
-anti-windup, filtering, metrics, experiments, tuning, and a portfolio release.
-Every phase has an acceptance criterion and proposed commit boundary in
-[roadmap.md](docs/roadmap.md).
+- [Requirements and scope](docs/requirements.md)
+- [Architecture](docs/architecture.md)
+- [PID theory](docs/pid-theory.md)
+- [Experiments](docs/experiments.md)
+- [Tuning](docs/tuning.md)
+- [Development roadmap](docs/roadmap.md)
+- [Release checklist](docs/release-checklist.md)
+- [Changelog](CHANGELOG.md)
 
 ## License
 
