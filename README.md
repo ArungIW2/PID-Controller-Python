@@ -60,9 +60,9 @@ saturation, anti-windup, and bumpless-transfer decisions.
 
 The default process is the stable first-order equation:
 
-\[
-\frac{dy}{dt}=\frac{Ku-y}{\tau}
-\]
+```math
+\frac{dy}{dt} = \frac{K u - y}{\tau}
+```
 
 It is integrated with forward Euler at the controller sample time. This model
 is intentionally compact: it exposes controller behavior without pretending to
