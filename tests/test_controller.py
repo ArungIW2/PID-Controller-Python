@@ -5,6 +5,8 @@ from math import inf, nan
 import pytest
 
 from pid_controller import (
+    AntiWindupMode,
+    OperatingMode,
     PIDConfig,
     PIDConfigurationError,
     PIDController,
@@ -177,3 +179,160 @@ def test_reset_clears_derivative_history() -> None:
     assert controller.update(0.0, 1.0).derivative != 0.0
     controller.reset()
     assert controller.update(0.0, 5.0).derivative == 0.0
+
+
+def test_output_limits_report_saturation() -> None:
+    """Controller output should be clamped while preserving raw output."""
+    controller = PIDController(PIDConfig(kp=10.0, output_limits=(-2.0, 3.0)))
+    high = controller.update(1.0, 0.0)
+    low = controller.update(-1.0, 0.0)
+    assert (high.raw_output, high.output, high.saturated) == (10.0, 3.0, True)
+    assert (low.raw_output, low.output, low.saturated) == (-10.0, -2.0, True)
+
+
+def test_clamping_anti_windup_stops_integral_pushing_into_limit() -> None:
+    """Conditional integration should stop further saturation pressure."""
+    controller = PIDController(
+        PIDConfig(kp=0.0, ki=2.0, sample_time=1.0, output_limits=(0.0, 5.0))
+    )
+    for _ in range(5):
+        result = controller.update(10.0, 0.0)
+    assert result.integral == 0.0
+    assert result.output == 0.0
+
+
+def test_clamping_allows_integral_to_recover_from_existing_state() -> None:
+    """Integral movement away from saturation should remain enabled."""
+    controller = PIDController(
+        PIDConfig(kp=0.0, ki=1.0, sample_time=1.0, output_limits=(-5.0, 5.0))
+    )
+    controller.update(4.0, 0.0)
+    recovered = controller.update(-2.0, 0.0)
+    assert recovered.integral == pytest.approx(2.0)
+
+
+def test_no_anti_windup_preserves_unlimited_integral_state() -> None:
+    """NONE mode should expose classic windup for comparison experiments."""
+    controller = PIDController(
+        PIDConfig(
+            kp=0.0,
+            ki=2.0,
+            sample_time=1.0,
+            output_limits=(0.0, 5.0),
+            anti_windup=AntiWindupMode.NONE,
+        )
+    )
+    result = controller.update(10.0, 0.0)
+    assert result.integral == 20.0
+    assert result.output == 5.0
+
+
+def test_back_calculation_moves_integral_toward_limited_output() -> None:
+    """Back calculation should feed saturation difference into integral state."""
+    controller = PIDController(
+        PIDConfig(
+            kp=0.0,
+            ki=2.0,
+            sample_time=0.5,
+            output_limits=(0.0, 5.0),
+            anti_windup=AntiWindupMode.BACK_CALCULATION,
+            back_calculation_gain=1.0,
+        )
+    )
+    result = controller.update(10.0, 0.0)
+    assert result.integral == pytest.approx(7.5)
+    assert result.output == 5.0
+
+
+def test_integral_limits_are_applied_without_output_saturation() -> None:
+    """Independent integral bounds should constrain stored contribution."""
+    controller = PIDController(
+        PIDConfig(
+            kp=0.0,
+            ki=10.0,
+            sample_time=1.0,
+            integral_limits=(-2.0, 2.0),
+        )
+    )
+    assert controller.update(1.0, 0.0).integral == 2.0
+    assert controller.update(-1.0, 0.0).integral == -2.0
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("output_limits", (2.0, 2.0)),
+        ("output_limits", (3.0, 2.0)),
+        ("output_limits", (None, inf)),
+        ("integral_limits", (-inf, None)),
+        ("output_limits", (0.0,)),
+        ("output_limits", [0.0, 1.0]),
+    ],
+)
+def test_invalid_limit_configuration_is_rejected(field: str, value: object) -> None:
+    """Limit pairs must be finite, ordered two-element tuples."""
+    with pytest.raises(PIDConfigurationError):
+        PIDConfig(kp=1.0, **{field: value})  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("gain", [-1.0, inf, nan])
+def test_invalid_back_calculation_gain_is_rejected(gain: float) -> None:
+    """Back-calculation feedback gain must be finite and non-negative."""
+    with pytest.raises(PIDConfigurationError):
+        PIDConfig(kp=1.0, back_calculation_gain=gain)
+
+
+def test_invalid_anti_windup_mode_is_rejected() -> None:
+    """Configuration should require a named anti-windup strategy."""
+    with pytest.raises(PIDConfigurationError):
+        PIDConfig(kp=1.0, anti_windup="clamp")  # type: ignore[arg-type]
+
+
+def test_manual_mode_clamps_output_and_freezes_integral() -> None:
+    """Manual operation should use operator output without integrating error."""
+    controller = PIDController(
+        PIDConfig(kp=1.0, ki=1.0, output_limits=(0.0, 5.0))
+    )
+    controller.set_mode(OperatingMode.MANUAL, manual_output=8.0)
+    result = controller.update(10.0, 0.0)
+    assert controller.mode is OperatingMode.MANUAL
+    assert result.raw_output == 8.0
+    assert result.output == 5.0
+    assert result.integral == 0.0
+    assert result.saturated is True
+
+
+def test_return_to_automatic_is_bumpless() -> None:
+    """First automatic output should match the last achievable manual output."""
+    controller = PIDController(
+        PIDConfig(kp=2.0, ki=1.0, sample_time=1.0, output_limits=(0.0, 10.0))
+    )
+    controller.set_mode(OperatingMode.MANUAL, manual_output=4.0)
+    controller.update(3.0, 1.0)
+    controller.set_mode(OperatingMode.AUTOMATIC)
+    result = controller.update(3.0, 1.0)
+    assert controller.mode is OperatingMode.AUTOMATIC
+    assert result.output == pytest.approx(4.0)
+
+
+@pytest.mark.parametrize("manual_output", [None, inf, nan])
+def test_manual_mode_requires_finite_output(manual_output: float | None) -> None:
+    """Manual operation requires an explicit finite command."""
+    with pytest.raises(PIDInputError):
+        PIDController(PIDConfig(kp=1.0)).set_mode(
+            OperatingMode.MANUAL, manual_output=manual_output
+        )
+
+
+def test_invalid_operating_mode_is_rejected() -> None:
+    """Operating mode must use the public enum."""
+    with pytest.raises(PIDInputError):
+        PIDController(PIDConfig(kp=1.0)).set_mode("automatic")  # type: ignore[arg-type]
+
+
+def test_reset_restores_automatic_mode() -> None:
+    """Reset should clear manual and transfer state."""
+    controller = PIDController(PIDConfig(kp=1.0))
+    controller.set_mode(OperatingMode.MANUAL, manual_output=1.0)
+    controller.reset()
+    assert controller.mode is OperatingMode.AUTOMATIC

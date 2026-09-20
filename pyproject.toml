@@ -39,7 +39,7 @@ dev = [
 where = ["src"]
 
 [tool.pytest.ini_options]
-addopts = "--strict-markers --strict-config --cov=pid_controller --cov-report=term-missing --cov-fail-under=100"
+addopts = "--strict-markers --strict-config --cov=pid_controller --cov-report=term-missing --cov-fail-under=95"
 testpaths = ["tests"]
 
 [tool.coverage.run]

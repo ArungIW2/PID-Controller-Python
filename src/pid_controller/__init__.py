@@ -1,6 +1,12 @@
 """Educational feedback-control components implemented in Python."""
 
-from pid_controller.controller import PIDConfig, PIDController, PIDResult
+from pid_controller.controller import (
+    AntiWindupMode,
+    OperatingMode,
+    PIDConfig,
+    PIDController,
+    PIDResult,
+)
 from pid_controller.exceptions import PIDConfigurationError, PIDInputError
 from pid_controller.models import FirstOrderProcess, FirstOrderProcessConfig
 from pid_controller.simulation import (
@@ -11,6 +17,8 @@ from pid_controller.simulation import (
 )
 
 __all__ = [
+    "AntiWindupMode",
+    "OperatingMode",
     "PIDConfig",
     "PIDConfigurationError",
     "PIDController",
