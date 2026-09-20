@@ -1,7 +1,15 @@
 # Experiments
 
-Reproducible gain and controller-comparison experiments will be introduced in
-Phase 8. Each experiment will declare its process model, initial conditions,
-sample time, duration, setpoint schedule, controller parameters, and random
-seed when randomness is used.
+Each experiment varies one factor while keeping the mathematical process,
+sample time, duration, and setpoint fixed. Run from the repository root after
+installing the project:
 
+```bash
+python experiments/proportional/run.py
+python experiments/integral/run.py
+python experiments/derivative/run.py
+python experiments/pid/run.py
+```
+
+Generated CSV, JSON, and PNG artifacts are written beneath `results/`, which is
+ignored by Git unless a curated result is deliberately released.
