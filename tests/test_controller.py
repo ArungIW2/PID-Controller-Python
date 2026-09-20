@@ -61,6 +61,15 @@ def test_invalid_sample_time_is_rejected(sample_time: float) -> None:
         PIDConfig(kp=1.0, sample_time=sample_time)
 
 
+@pytest.mark.parametrize("filter_tau", [-0.1, inf, nan])
+def test_invalid_derivative_filter_time_constant_is_rejected(
+    filter_tau: float,
+) -> None:
+    """Derivative filter time constant must be finite and non-negative."""
+    with pytest.raises(PIDConfigurationError):
+        PIDConfig(kp=1.0, derivative_filter_tau=filter_tau)
+
+
 @pytest.mark.parametrize(
     ("setpoint", "measurement"),
     [(nan, 0.0), (0.0, nan), (inf, 0.0), (0.0, -inf)],
@@ -121,3 +130,50 @@ def test_reset_clears_integral_state() -> None:
     controller.update(2.0, 0.0)
     controller.reset()
     assert controller.update(2.0, 0.0).integral == pytest.approx(1.0)
+
+
+def test_derivative_on_error_uses_error_difference() -> None:
+    """Error-based derivative should respond to a setpoint change."""
+    controller = PIDController(
+        PIDConfig(
+            kp=0.0,
+            kd=2.0,
+            sample_time=0.5,
+            derivative_on_measurement=False,
+        )
+    )
+
+    assert controller.update(1.0, 0.0).derivative == 0.0
+    assert controller.update(2.0, 0.0).derivative == pytest.approx(4.0)
+
+
+def test_derivative_on_measurement_avoids_setpoint_kick() -> None:
+    """Changing only setpoint should not create derivative-on-measurement kick."""
+    controller = PIDController(PIDConfig(kp=0.0, kd=3.0, sample_time=0.25))
+    controller.update(1.0, 0.0)
+    assert controller.update(4.0, 0.0).derivative == 0.0
+    assert controller.update(4.0, 1.0).derivative == pytest.approx(-12.0)
+
+
+def test_derivative_filter_applies_first_order_smoothing() -> None:
+    """A positive filter constant should attenuate a derivative step."""
+    controller = PIDController(
+        PIDConfig(
+            kp=0.0,
+            kd=2.0,
+            sample_time=0.1,
+            derivative_filter_tau=0.1,
+        )
+    )
+    controller.update(0.0, 0.0)
+    result = controller.update(0.0, 1.0)
+    assert result.derivative == pytest.approx(-10.0)
+
+
+def test_reset_clears_derivative_history() -> None:
+    """The first update after reset should use the zero-derivative policy."""
+    controller = PIDController(PIDConfig(kp=0.0, kd=1.0))
+    controller.update(0.0, 0.0)
+    assert controller.update(0.0, 1.0).derivative != 0.0
+    controller.reset()
+    assert controller.update(0.0, 5.0).derivative == 0.0

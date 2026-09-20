@@ -26,6 +26,8 @@ class PIDConfig:
     ki: float = 0.0
     kd: float = 0.0
     sample_time: float = 0.1
+    derivative_on_measurement: bool = True
+    derivative_filter_tau: float = 0.0
 
     def __post_init__(self) -> None:
         """Validate gains and the fixed controller sample time."""
@@ -36,6 +38,11 @@ class PIDConfig:
         _require_finite("sample_time", self.sample_time, PIDConfigurationError)
         if self.sample_time <= 0.0:
             raise PIDConfigurationError("sample_time must be greater than zero")
+        _require_finite(
+            "derivative_filter_tau", self.derivative_filter_tau, PIDConfigurationError
+        )
+        if self.derivative_filter_tau < 0.0:
+            raise PIDConfigurationError("derivative_filter_tau must be non-negative")
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,6 +69,9 @@ class PIDController:
             raise TypeError("config must be a PIDConfig instance")
         self._config = config
         self._integral = 0.0
+        self._previous_error: float | None = None
+        self._previous_measurement: float | None = None
+        self._derivative_state = 0.0
 
     @property
     def config(self) -> PIDConfig:
@@ -75,17 +85,41 @@ class PIDController:
         error = setpoint - measurement
         proportional = self._config.kp * error
         self._integral += self._config.ki * error * self._config.sample_time
-        raw_output = proportional + self._integral
+        derivative = self._calculate_derivative(error, measurement)
+        raw_output = proportional + self._integral + derivative
+        self._previous_error = error
+        self._previous_measurement = measurement
         return PIDResult(
             setpoint=setpoint,
             measurement=measurement,
             error=error,
             proportional=proportional,
             integral=self._integral,
-            derivative=0.0,
+            derivative=derivative,
             raw_output=raw_output,
             output=raw_output,
         )
+
+    def _calculate_derivative(self, error: float, measurement: float) -> float:
+        """Calculate optional filtered derivative contribution."""
+        if self._previous_error is None or self._previous_measurement is None:
+            return 0.0
+
+        if self._config.derivative_on_measurement:
+            rate = -(
+                measurement - self._previous_measurement
+            ) / self._config.sample_time
+        else:
+            rate = (error - self._previous_error) / self._config.sample_time
+
+        if self._config.derivative_filter_tau > 0.0:
+            alpha = self._config.sample_time / (
+                self._config.derivative_filter_tau + self._config.sample_time
+            )
+            self._derivative_state += alpha * (rate - self._derivative_state)
+        else:
+            self._derivative_state = rate
+        return self._config.kd * self._derivative_state
 
     def reset(self) -> None:
         """Reset controller state.
@@ -94,3 +128,6 @@ class PIDController:
         equivalent to a new controller with the same configuration.
         """
         self._integral = 0.0
+        self._previous_error = None
+        self._previous_measurement = None
+        self._derivative_state = 0.0
