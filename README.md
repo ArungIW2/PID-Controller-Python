@@ -6,8 +6,7 @@
 
 A software-only, from-first-principles PID controller for learning feedback
 control, discrete implementation, response analysis, tuning, and Python
-engineering. The project was built as an engineering portfolio for a career
-path from production operations toward Automation/PLC Engineering.
+engineering.
 
 The repository deliberately avoids PID libraries as its controller
 implementation. NumPy, Pandas, and Matplotlib support analysis and
