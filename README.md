@@ -48,9 +48,9 @@ flowchart LR
 
 The continuous reference equation is:
 
-\`\`\`math
+```math
 u(t) = K_p e(t) + K_i \int e(t)\,dt + K_d \frac{de(t)}{dt}
-\`\`\`
+```
 
 The actual code uses documented discrete-time equations. See
 [PID theory](docs/pid-theory.md) for integral, derivative, filtering,
