@@ -6,7 +6,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from math import isclose, isfinite
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from pid_controller.controller import PIDController
 from pid_controller.exceptions import PIDInputError
@@ -57,18 +57,16 @@ class SimulationResult:
         """Convert all records to a Pandas DataFrame for analysis or export."""
         import pandas as pd
 
-        return cast(
-            "DataFrame",
-            pd.DataFrame(
-                [
-                    {
-                        field: getattr(record, field)
-                        for field in record.__dataclass_fields__
-                    }
-                    for record in self.records
-                ]
-            ),
+        frame: DataFrame = pd.DataFrame(
+            [
+                {
+                    field: getattr(record, field)
+                    for field in record.__dataclass_fields__
+                }
+                for record in self.records
+            ]
         )
+        return frame
 
     def to_csv(self, path: str | Path) -> None:
         """Write records to CSV without an implicit index column."""

@@ -6,6 +6,7 @@ All notable project changes are documented here.
 
 - Constrain NumPy below 2.4 so strict type checking remains compatible with the
   project's Python 3.10 target across the CI matrix.
+- Keep Pandas DataFrame typing valid across Python 3.10–3.12 stub variants.
 - Implement P, PI, PD, and PID control from first principles.
 - Add derivative-on-measurement and first-order derivative filtering.
 - Add output/integral limits, clamping and back-calculation anti-windup.
