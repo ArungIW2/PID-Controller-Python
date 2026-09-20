@@ -61,6 +61,7 @@ class PIDController:
         if not isinstance(config, PIDConfig):
             raise TypeError("config must be a PIDConfig instance")
         self._config = config
+        self._integral = 0.0
 
     @property
     def config(self) -> PIDConfig:
@@ -73,21 +74,23 @@ class PIDController:
         _require_finite("measurement", measurement, PIDInputError)
         error = setpoint - measurement
         proportional = self._config.kp * error
+        self._integral += self._config.ki * error * self._config.sample_time
+        raw_output = proportional + self._integral
         return PIDResult(
             setpoint=setpoint,
             measurement=measurement,
             error=error,
             proportional=proportional,
-            integral=0.0,
+            integral=self._integral,
             derivative=0.0,
-            raw_output=proportional,
-            output=proportional,
+            raw_output=raw_output,
+            output=raw_output,
         )
 
     def reset(self) -> None:
         """Reset controller state.
 
-        Proportional control is stateless, so this is currently an intentional
-        no-op that establishes the public reset contract for later phases.
+        This clears accumulated integral action and makes the next result
+        equivalent to a new controller with the same configuration.
         """
-
+        self._integral = 0.0

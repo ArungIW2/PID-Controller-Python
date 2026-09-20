@@ -87,3 +87,37 @@ def test_reset_is_safe_for_stateless_proportional_control() -> None:
     controller.reset()
     after = controller.update(1.0, 0.0)
     assert before == after
+
+
+def test_integral_accumulates_error_over_fixed_time_steps() -> None:
+    """PI control should retain the discrete integral contribution."""
+    controller = PIDController(PIDConfig(kp=2.0, ki=0.5, sample_time=0.2))
+
+    first = controller.update(5.0, 3.0)
+    second = controller.update(5.0, 3.0)
+
+    assert first.integral == pytest.approx(0.2)
+    assert first.output == pytest.approx(4.2)
+    assert second.integral == pytest.approx(0.4)
+    assert second.output == pytest.approx(4.4)
+
+
+def test_integral_respects_error_sign_and_sample_time() -> None:
+    """Negative error should reduce the integral using the configured step."""
+    controller = PIDController(PIDConfig(kp=0.0, ki=2.0, sample_time=0.25))
+    assert controller.update(0.0, 4.0).integral == pytest.approx(-2.0)
+
+
+def test_zero_integral_gain_disables_integral_action() -> None:
+    """P-only operation should not accumulate hidden integral state."""
+    controller = PIDController(PIDConfig(kp=1.0, ki=0.0))
+    controller.update(10.0, 0.0)
+    assert controller.update(10.0, 0.0).integral == 0.0
+
+
+def test_reset_clears_integral_state() -> None:
+    """Reset should restart PI control from a zero integral contribution."""
+    controller = PIDController(PIDConfig(kp=0.0, ki=1.0, sample_time=0.5))
+    controller.update(2.0, 0.0)
+    controller.reset()
+    assert controller.update(2.0, 0.0).integral == pytest.approx(1.0)
