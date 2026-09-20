@@ -5,10 +5,15 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass
 from math import isclose, isfinite
+from pathlib import Path
+from typing import TYPE_CHECKING, cast
 
 from pid_controller.controller import PIDController
 from pid_controller.exceptions import PIDInputError
 from pid_controller.models import ProcessModel
+
+if TYPE_CHECKING:
+    from pandas import DataFrame
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,6 +52,27 @@ class SimulationResult:
         if name not in SimulationRecord.__dataclass_fields__ or name == "saturated":
             raise KeyError(f"unknown numeric signal: {name}")
         return tuple(float(getattr(record, name)) for record in self.records)
+
+    def to_dataframe(self) -> DataFrame:
+        """Convert all records to a Pandas DataFrame for analysis or export."""
+        import pandas as pd
+
+        return cast(
+            "DataFrame",
+            pd.DataFrame(
+                [
+                    {
+                        field: getattr(record, field)
+                        for field in record.__dataclass_fields__
+                    }
+                    for record in self.records
+                ]
+            ),
+        )
+
+    def to_csv(self, path: str | Path) -> None:
+        """Write records to CSV without an implicit index column."""
+        self.to_dataframe().to_csv(path, index=False)
 
 
 def run_closed_loop(
