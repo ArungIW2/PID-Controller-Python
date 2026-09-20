@@ -23,6 +23,14 @@ from pid_controller.simulation import (
     SimulationResult,
     run_closed_loop,
 )
+from pid_controller.tuning import (
+    TuningCandidate,
+    TuningWeights,
+    evaluate_robustness,
+    parameter_sweep,
+    score_metrics,
+    ziegler_nichols_closed_loop,
+)
 from pid_controller.visualization import plot_comparison, plot_simulation
 
 __all__ = [
@@ -41,14 +49,20 @@ __all__ = [
     "SetpointChange",
     "SimulationRecord",
     "SimulationResult",
+    "TuningCandidate",
+    "TuningWeights",
     "__version__",
     "calculate_metrics",
     "export_experiment",
+    "evaluate_robustness",
+    "parameter_sweep",
     "plot_comparison",
     "plot_simulation",
     "run_closed_loop",
     "run_controller_comparison",
     "run_gain_sweep",
+    "score_metrics",
+    "ziegler_nichols_closed_loop",
 ]
 
 __version__ = "0.1.0"
