@@ -4,6 +4,8 @@ All notable project changes are documented here.
 
 ## 1.0.0 — 2026-09-20
 
+- Constrain NumPy below 2.4 so strict type checking remains compatible with the
+  project's Python 3.10 target across the CI matrix.
 - Implement P, PI, PD, and PID control from first principles.
 - Add derivative-on-measurement and first-order derivative filtering.
 - Add output/integral limits, clamping and back-calculation anti-windup.
@@ -14,4 +16,3 @@ All notable project changes are documented here.
 - Add bounded parameter-sweep tuning, Ziegler–Nichols conversion, and process
   parameter robustness evaluation.
 - Add comprehensive tests, strict typing, linting, packaging, and CI.
-
